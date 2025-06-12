@@ -2,6 +2,20 @@
 # Script to add and initialize git submodules with locked versions
 set -e  # Exit immediately on error
 
+# Check if git is installed and version is supported
+if ! command -v git &> /dev/null; then
+    echo "Error: Git is not installed. Please install Git to proceed."
+    exit 1
+fi
+
+# Check git version (requires at least 2.0.0 for submodule support)
+GIT_VERSION=$(git --version | awk '{print $3}')
+REQUIRED_VERSION="2.0.0"
+if [ "$(printf '%s\n' "$REQUIRED_VERSION" "$GIT_VERSION" | sort -V | head -n1)" != "$REQUIRED_VERSION" ]; then
+    echo "Error: Git version $GIT_VERSION is too old. Please upgrade to version $REQUIRED_VERSION or higher."
+    exit 1
+fi
+
 # Add silkpre (commit 3322bb8)
 echo "Adding silkpre (3322bb8)..."
 git submodule add -f https://github.com/torquem-ch/silkpre.git deps/silkpre
