@@ -74,7 +74,8 @@ git submodule update --init --recursive
 echo "Checking submodule status..."
 git submodule status
 
-echo "✅ All submodules added and initialized successfully!"
-echo "Next steps:"
-echo "1. git add .gitmodules deps/"
-echo "2. git commit -m 'Add submodules with version locking'"
+echo "Initializing and recursively updating all submodules..."
+git submodule update --init --recursive  
+
+echo "Checking submodule status..."
+git submodule status 
