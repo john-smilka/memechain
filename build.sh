@@ -1,95 +1,89 @@
-# Compiled object files
-*.o
-*.obj
-*.a
-*.lib
-*.so
-*.dylib
-*.exe
-*.out
-*.app
+#!/bin/bash
 
-# Precompiled headers
-*.gch
-*.pch
+# Set log file environment variable
+export LOGFILE="$(pwd)/build.log"
 
-# Compiled static libraries
-*.lai
-*.la
-*.lo
+# Function to log messages to both console and log file
+log_message() {
+    echo "$1" | tee -a "$LOGFILE"
+}
 
-# Executables and binaries
-bin/
-build/
-dist/
+# Initialize log file
+: > "$LOGFILE"
+log_message "Starting build process at $(date)"
 
-# Dependency files
-*.d
+# Check if cmake is installed and version is >= 3.15.0
+log_message "Checking cmake installation and version..."
+if ! command -v cmake &> /dev/null; then
+    log_message "Error: cmake is not installed. Please install cmake version 3.15.0 or higher."
+    exit 1
+fi
 
-# Build directories
-CMakeFiles/
-cmake_install.cmake
-CMakeCache.txt
-Makefile
-*.make
-*.ninja
-.ninja_deps
-.ninja_log
+CMAKE_VERSION=$(cmake --version | head -n1 | cut -d" " -f3)
+CMAKE_MAJOR=$(echo "$CMAKE_VERSION" | cut -d. -f1)
+CMAKE_MINOR=$(echo "$CMAKE_VERSION" | cut -d. -f2)
+CMAKE_PATCH=$(echo "$CMAKE_VERSION" | cut -d. -f3)
 
-# IDE and editor files
-.vscode/
-.idea/
-*.suo
-*.sdf
-*.sln
-*.vcxproj
-*.vcxproj.filters
-*.vcxproj.user
-*.code-workspace
-*.swp
-*~
-.DS_Store
+if [ "$CMAKE_MAJOR" -lt 3 ] || { [ "$CMAKE_MAJOR" -eq 3 ] && [ "$CMAKE_MINOR" -lt 15 ]; }; then
+    log_message "Error: cmake version $CMAKE_VERSION is too old. Required version is 3.15.0 or higher."
+    exit 1
+fi
+log_message "Found cmake version $CMAKE_VERSION"
 
-# Test and coverage files
-*.gcno
-*.gcda
-*.gcov
-coverage/
-test-results/
+# Check if git is installed and version is >= 2.0.0
+log_message "Checking git installation and version..."
+ISGIT=0
+if command -v git &> /dev/null; then
+    GIT_VERSION=$(git --version | cut -d" " -f3)
+    GIT_MAJOR=$(echo "$GIT_VERSION" | cut -d. -f1)
+    GIT_MINOR=$(echo "$GIT_VERSION" | cut -d. -f2)
+    
+    if [ "$GIT_MAJOR" -gt 2 ] || { [ "$GIT_MAJOR" -eq 2 ] && [ "$GIT_MINOR" -ge 0 ]; }; then
+        ISGIT=1
+        log_message "Found git version $GIT_VERSION"
+    else
+        log_message "Warning: git version $GIT_VERSION is too old. Required version is 2.0.0 or higher."
+    fi
+else
+    log_message "Warning: git is not installed."
+fi
 
-# Logs and temporary files
-*.log
-*.tmp
-*.bak
-*.cache
-*.pid
-*.pid.lock
+# Execute appropriate script based on ISGIT value
+log_message "Executing dependency setup based on git availability..."
+if [ "$ISGIT" -eq 0 ]; then
+    log_message "Running make_dep_build.sh as git is not available or version is too old"
+    if [ -f "./dep_build/make_dep_build.sh" ]; then
+        bash ./dep_build/make_dep_build.sh 2>&1 | tee -a "$LOGFILE"
+        if [ $? -ne 0 ]; then
+            log_message "Error: make_dep_build.sh failed"
+            exit 1
+        fi
+    else
+        log_message "Error: make_dep_build.sh not found in dep_build directory"
+        exit 1
+    fi
+else
+    log_message "Running setup_and_init_submodules.sh as git is available"
+    if [ -f "./setup_and_init_submodules.sh" ]; then
+        bash ./setup_and_init_submodules.sh 2>&1 | tee -a "$LOGFILE"
+        if [ $? -ne 0 ]; then
+            log_message "Error: setup_and_init_submodules.sh failed"
+            exit 1
+        fi
+    else
+        log_message "Error: setup_and_init_submodules.sh not found"
+        exit 1
+    fi
+fi
 
-# Package and dependency management
-vendor/
-deps/
-external/
-node_modules/
+# Create build directory and run cmake
+log_message "Creating build directory and running cmake..."
+mkdir -p build
+cd build || { log_message "Error: Failed to change to build directory"; exit 1; }
+cmake .. 2>&1 | tee -a "$LOGFILE"
+if [ $? -ne 0 ]; then
+    log_message "Error: cmake configuration failed"
+    exit 1
+fi
 
-# Boost-specific (if applicable)
-b2
-bjam
-project-config.jam
-*.jam
-tools/build/
-libs/*/test/*.xml
-libs/*/test/*.output
-
-# Documentation build artifacts
-doc/html/
-doc/xml/
-doc/pdf/
-
-# Miscellaneous
-*.stackdump
-core
-core.*
-*.pdb
-*.ilk
-*.map
-*.exp
+log_message "Build setup completed successfully at $(date)"
