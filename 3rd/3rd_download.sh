@@ -32,30 +32,32 @@ download_and_extract() {
     # Check if file already exists
     if [ -f "$filename" ]; then
         log_message "File $filename already exists, skipping download."
-        return 0
+    else
+        # Download file using curl
+        log_message "Downloading $filename from $url..."
+        if curl -L -o "$filename" "$url"; then
+            log_message "Download successful: $filename"
+        else
+            log_message "Download failed for $filename"
+            rm -f "$filename"
+            return 1
+        fi
     fi
 
-    # Download file using curl
-    log_message "Downloading $filename from $url..."
-    if curl -L -o "$filename" "$url"; then
-        log_message "Download successful: $filename"
-        
-        # Extract file to specified directory
-        log_message "Extracting $filename to $extract_dir..."
-        mkdir -p "$extract_dir"
-        if [[ "$filename" == *.tar.gz ]]; then
-            tar -xzf "$filename" -C "$extract_dir"
-        elif [[ "$filename" == *.tar.xz ]]; then
-            tar -xJf "$filename" -C "$extract_dir"
-        elif [[ "$filename" == *.zip ]]; then
-            unzip -q "$filename" -d "$extract_dir"
-        fi
-        log_message "Extraction completed for $filename"
+    # Extract file to specified directory
+    log_message "Extracting $filename to $extract_dir..."
+    mkdir -p "$extract_dir"
+    if [[ "$filename" == *.tar.gz ]]; then
+        tar -xzf "$filename" -C "$extract_dir"
+    elif [[ "$filename" == *.tar.xz ]]; then
+        tar -xJf "$filename" -C "$extract_dir"
+    elif [[ "$filename" == *.zip ]]; then
+        unzip -q "$filename" -d "$extract_dir"
     else
-        log_message "Download failed for $filename"
-        rm -f "$filename"
+        log_message "Unsupported file format for $filename"
         return 1
     fi
+    log_message "Extraction completed for $filename"
 }
 
 # Download and extract evmone v0.11.0
