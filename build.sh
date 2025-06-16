@@ -76,6 +76,21 @@ else
     fi
 fi
 
+
+# run make_depend.sh
+log_message "execute make_depend.sh ..."
+if [ -f "./make_depend.sh" ]; then
+        bash ./make_depend.sh 2>&1 | tee -a "$LOGFILE"
+        if [ $? -ne 0 ]; then
+            log_message "Error: make_depend.sh failed"
+            exit 1
+        fi
+    else
+        log_message "Error: make_depend.sh not found"
+        exit 1
+    fi
+
+
 # Create build directory and run cmake
 log_message "Creating build directory and running cmake..."
 mkdir -p build
