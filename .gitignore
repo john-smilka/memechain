@@ -70,6 +70,8 @@ vendor/
 deps/
 external/
 node_modules/
+deps_build/
+.gitmodules
 
 # Boost-specific (if applicable)
 b2
