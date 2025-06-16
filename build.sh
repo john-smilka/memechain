@@ -1,0 +1,95 @@
+# Compiled object files
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dylib
+*.exe
+*.out
+*.app
+
+# Precompiled headers
+*.gch
+*.pch
+
+# Compiled static libraries
+*.lai
+*.la
+*.lo
+
+# Executables and binaries
+bin/
+build/
+dist/
+
+# Dependency files
+*.d
+
+# Build directories
+CMakeFiles/
+cmake_install.cmake
+CMakeCache.txt
+Makefile
+*.make
+*.ninja
+.ninja_deps
+.ninja_log
+
+# IDE and editor files
+.vscode/
+.idea/
+*.suo
+*.sdf
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.code-workspace
+*.swp
+*~
+.DS_Store
+
+# Test and coverage files
+*.gcno
+*.gcda
+*.gcov
+coverage/
+test-results/
+
+# Logs and temporary files
+*.log
+*.tmp
+*.bak
+*.cache
+*.pid
+*.pid.lock
+
+# Package and dependency management
+vendor/
+deps/
+external/
+node_modules/
+
+# Boost-specific (if applicable)
+b2
+bjam
+project-config.jam
+*.jam
+tools/build/
+libs/*/test/*.xml
+libs/*/test/*.output
+
+# Documentation build artifacts
+doc/html/
+doc/xml/
+doc/pdf/
+
+# Miscellaneous
+*.stackdump
+core
+core.*
+*.pdb
+*.ilk
+*.map
+*.exp
