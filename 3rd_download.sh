@@ -17,11 +17,24 @@ log_message() {
 # Create log file if it doesn't exist
 touch "$LOGFILE"
 
+# Define 3rd directory for downloads
+THIRD_DIR="$(pwd)/3rd"
+
+# Create 3rd directory if it doesn't exist
+log_message "Checking for 3rd directory..."
+if [ ! -d "$THIRD_DIR" ]; then
+    mkdir -p "$THIRD_DIR" || { log_message "Failed to create 3rd directory."; exit 1; }
+    log_message "Created 3rd directory at $THIRD_DIR."
+else
+    log_message "3rd directory already exists at $THIRD_DIR."
+fi
+
 # Define target directory for extraction
-DEPS_BUILD_DIR="$(pwd)/../deps_build"
+DEPS_BUILD_DIR="$(pwd)/deps_build"
 
 # Create deps_build directory if it doesn't exist
-mkdir -p "$DEPS_BUILD_DIR"
+log_message "Checking for deps_build directory..."
+mkdir -p "$DEPS_BUILD_DIR" || { log_message "Failed to create deps_build directory."; exit 1; }
 
 # Function to download and extract file
 download_and_extract() {
@@ -29,40 +42,60 @@ download_and_extract() {
     local filename=$2
     local extract_dir=$3
 
-    # Check if file already exists
-    if [ -f "$filename" ]; then
-        log_message "File $filename already exists, skipping download."
+    # Define full path for downloaded file in 3rd directory
+    local download_path="$THIRD_DIR/$filename"
+
+    # Check if file already exists in 3rd directory
+    if [ -f "$download_path" ]; then
+        log_message "File $filename already exists in 3rd directory, skipping download."
     else
-        # Download file using curl
-        log_message "Downloading $filename from $url..."
-        if curl -L -o "$filename" "$url"; then
+        # Download file using curl to 3rd directory
+        log_message "Downloading $filename from $url to 3rd directory..."
+        if curl -L -o "$download_path" "$url"; then
             log_message "Download successful: $filename"
         else
             log_message "Download failed for $filename"
-            rm -f "$filename"
+            rm -f "$download_path"
             return 1
         fi
     fi
 
     # Extract file to specified directory
-    log_message "Extracting $filename to $extract_dir..."
-    mkdir -p "$extract_dir"
+    log_message "Extracting $filename from 3rd directory to $extract_dir..."
+    mkdir -p "$extract_dir" || { log_message "Failed to create extraction directory $extract_dir."; return 1; }
     if [[ "$filename" == *.tar.gz ]]; then
-        tar -xzf "$filename" -C "$extract_dir"
+        tar -xzf "$download_path" -C "$extract_dir"
     elif [[ "$filename" == *.tar.xz ]]; then
-        tar -xJf "$filename" -C "$extract_dir"
+        tar -xJf "$download_path" -C "$extract_dir"
     elif [[ "$filename" == *.zip ]]; then
-        unzip -q "$filename" -d "$extract_dir"
+        unzip -q "$download_path" -d "$extract_dir"
     else
         log_message "Unsupported file format for $filename"
         return 1
     fi
-    log_message "Extraction completed for $filename"
+
+    # Move contents from the extracted subdirectory to extract_dir
+    log_message "Moving contents to $extract_dir..."
+    # Find the single top-level directory in extract_dir (if any)
+    subdir=$(find "$extract_dir" -maxdepth 1 -type d | grep -v "^${extract_dir}$" | head -n 1)
+    if [ -n "$subdir" ] && [ -d "$subdir" ]; then
+        # Move all contents (including hidden files) of the subdirectory to extract_dir
+        shopt -s dotglob # Enable moving hidden files
+        mv "$subdir"/* "$extract_dir"/ || { log_message "Failed to move contents from $subdir to $extract_dir."; return 1; }
+        shopt -u dotglob # Disable dotglob to avoid affecting other operations
+        # Remove the subdirectory (use rm -rf to handle non-empty directories)
+        rm -rf "$subdir" || { log_message "Failed to remove subdirectory $subdir."; return 1; }
+        log_message "Moved contents from $subdir to $extract_dir and removed $subdir."
+    else
+        log_message "No subdirectory found in $extract_dir, no move needed."
+    fi
+
+    log_message "Extraction and reorganization completed for $filename"
 }
 
 # Download and extract evmone v0.11.0
-download_and_extract "https://github.com/ethereum/evmone/releases/download/v0.11.0/evmone-0.11.0-linux-x86_64.tar.gz" \
-    "evmone-0.11.0-linux-x86_64.tar.gz" "$DEPS_BUILD_DIR/evmone"
+download_and_extract "https://github.com/ethereum/evmone/archive/refs/tags/v0.11.0.zip" \
+    "evmone-0.11.0.zip" "$DEPS_BUILD_DIR/evmone"
 
 # Download and extract silkpre commit 3322bb898ac9528fc2cf9a8df1e48360420d0c1a
 download_and_extract "https://github.com/torquem-ch/silkpre/archive/3322bb898ac9528fc2cf9a8df1e48360420d0c1a.tar.gz" \
