@@ -1,6 +1,12 @@
+[submodule "deps/silkpre"]
+	path = deps/silkpre
+	url = https://github.com/MeMeChainLab/silkpre-mmc.git
 [submodule "deps/evmone"]
 	path = deps/evmone
 	url = https://github.com/ethereum/evmone.git
+[submodule "deps/boost"]
+	path = deps/boost
+	url = https://github.com/boostorg/boost.git
 [submodule "deps/cryptopp"]
 	path = deps/cryptopp
 	url = https://github.com/weidai11/cryptopp.git
