@@ -67,12 +67,10 @@ test-results/
 
 # Package and dependency management
 vendor/
-deps/
 3rd/
 external/
 node_modules/
 deps_build/
-.gitmodules
 
 # Boost-specific (if applicable)
 b2

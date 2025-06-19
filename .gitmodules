@@ -1,0 +1,21 @@
+[submodule "deps/evmone"]
+	path = deps/evmone
+	url = https://github.com/ethereum/evmone.git
+[submodule "deps/cryptopp"]
+	path = deps/cryptopp
+	url = https://github.com/weidai11/cryptopp.git
+[submodule "deps/libfmt"]
+	path = deps/libfmt
+	url = https://github.com/fmtlib/fmt.git
+[submodule "deps/openssl"]
+	path = deps/openssl
+	url = https://github.com/openssl/openssl.git
+[submodule "deps/protobuf"]
+	path = deps/protobuf
+	url = https://github.com/protocolbuffers/protobuf.git
+[submodule "deps/rocksdb"]
+	path = deps/rocksdb
+	url = https://github.com/facebook/rocksdb.git
+[submodule "deps/spdlog"]
+	path = deps/spdlog
+	url = https://github.com/gabime/spdlog.git

@@ -12,18 +12,6 @@ log_message() {
 : > "$LOGFILE"
 log_message "Build process started at $(date)"
 
-# Determine ISGIT based on input parameter
-if [ "$1" = "git" ]; then
-    ISGIT=1
-    log_message "Parameter 'git' detected, ISGIT set to 1"
-elif [ "$1" = "src" ] || [ -z "$1" ]; then
-    ISGIT=0
-    log_message "Parameter 'src' or no parameter detected, ISGIT set to 0"
-else
-    log_message "Invalid parameter. Use 'git' or 'src'."
-    exit 1
-fi
-
 # Check if cmake is installed and version is >= 3.15.0
 log_message "Checking cmake installation and version..."
 if ! command -v cmake &> /dev/null; then
@@ -40,19 +28,21 @@ fi
 log_message "cmake version $CMAKE_VERSION is sufficient."
 
 # Execute appropriate script based on ISGIT
-if [ $ISGIT -eq 0 ]; then
-    log_message "Executing 3rd_download.sh..."
-    if ! bash ./3rd_download.sh; then
-        log_message "Error: 3rd_download.sh execution failed."
-        exit 1
-    fi
-else
-    log_message "Executing setup_and_init_submodules.sh..."
-    if ! bash ./setup_and_init_submodules.sh >> "$LOGFILE" 2>&1; then
-        log_message "Error: setup_and_init_submodules.sh execution failed."
-        exit 1
-    fi
+log_message "Executing setup_and_init_submodules.sh..."
+if ! bash ./setup_and_init_submodules.sh ; then
+    log_message "Error: setup_and_init_submodules.sh execution failed."
+    exit 1
 fi
+log_message "Submodules setup completed successfully."
+
+# Execute dependency build script
+log_message "Executing make_depend.sh to build dependencies..."
+if ! bash ./make_depend.sh >> "$LOGFILE" 2>&1; then
+    log_message "Error: make_depend.sh execution failed."
+    log_message "Please check make_depend.log and make_depend_errors.log for details."
+    exit 1
+fi
+log_message "Dependencies build completed successfully."
 
 # Create build directory and run cmake
 log_message "Creating build directory..."

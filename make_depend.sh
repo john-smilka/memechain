@@ -1,62 +1,174 @@
 #!/bin/sh
+# Script to build and compile dependencies
+set -e  # Exit immediately on error
 
-echo "-- start make depend:"
+# Log files
+LOG_FILE="make_depend.log"
+ERROR_LOG_FILE="make_depend_errors.log"
 
+# Clean log files
+> "$LOG_FILE"
+> "$ERROR_LOG_FILE"
+
+# Directory definitions
 SHDIR=$(dirname `readlink -f $0`)
 DEPS_DIR=$SHDIR/deps
-BUILD_DEPS_DIR=$SHDIR/deps_build  
+BUILD_DEPS_DIR=$SHDIR/deps_build
 
-echo "project root: $SHDIR"
-echo "prime deps: $DEPS_DIR"
-echo "build root: $BUILD_DEPS_DIR"
+# Function to copy library files if build directory is empty
+copy_library_files() {
+    local lib_name=$1
+    local src_dir=$2
+    local build_dir=$3
 
+    # Create build directory if it doesn't exist
+    mkdir -p "$build_dir"
 
-#echo "copy files..."
-#rsync -a --delete $DEPS_DIR/ $BUILD_DEPS_DIR/ || exit 1
-
-OPENSSL_DIR=$BUILD_DEPS_DIR/openssl
-ROCKSDB_DIR=$BUILD_DEPS_DIR/rocksdb
-PROTOBUF_DIR=$BUILD_DEPS_DIR/protobuf
-BOOST_DIR=$BUILD_DEPS_DIR/boost
-LIBFMT_DIR=$BUILD_DEPS_DIR/libfmt
-SPDLOG_DIR=$BUILD_DEPS_DIR/spdlog
-EVMONE_DIR=$BUILD_DEPS_DIR/evmone
-SILKPRE_DIR=$BUILD_DEPS_DIR/silkpre
-CRYPTOPP_DIR=$BUILD_DEPS_DIR/cryptopp
-
-COMPILE_NUM=`cat /proc/cpuinfo| grep "processor" | wc -l`;
-
-check_compile_result() {
-    if [ $? -eq 0 ]; then
-        echo "$1 compile success"
-        return 0
+    # Check if build directory is empty
+    if [ ! "$(ls -A "$build_dir")" ]; then
+        echo "Copying $lib_name files to build directory..."
+        rsync -a "$src_dir/" "$build_dir/"
     else
-        echo "$1 compile failed"
-        return 1
+        echo "$lib_name build directory is not empty, skipping copy"
     fi
 }
-# openssl
-if [ ! -f "$OPENSSL_DIR/libcrypto.a" ]; 
-then
-        cd $OPENSSL_DIR && ./Configure && make -j$COMPILE_NUM 
+
+# Get number of CPU cores
+COMPILE_NUM=$(cat /proc/cpuinfo | grep "processor" | wc -l)
+
+# Function to check if library exists
+check_library_exists() {
+    local lib_name=$1
+    shift
+    local lib_paths=("$@")
+
+    for path in "${lib_paths[@]}"; do
+        if [ -f "$path" ]; then
+            echo "Library $lib_name already exists: $path"
+            return 0
+        fi
+    done
+    return 1
+}
+
+# Function to compile libraries
+compile_library() {
+    local lib_name=$1
+    local src_dir=$2
+    local build_dir=$3
+    local build_cmd=$4
+    local lib_paths=("${@:5}")
+
+    # Copy library files if needed
+    copy_library_files "$lib_name" "$src_dir" "$build_dir"
+
+    # Check if library already exists
+    if check_library_exists "$lib_name" "${lib_paths[@]}"; then
+        return 0
+    fi
+
+    echo "Compiling $lib_name..."
+    if ! (cd "$build_dir" && eval "$build_cmd"); then
+        echo "Failed to compile $lib_name"
+        return 1
+    fi
+
+    return 0
+}
+
+# Compile libraries
+compile_libraries() {
+    # OpenSSL
+    compile_library "OpenSSL" \
+        "$DEPS_DIR/openssl" \
+        "$BUILD_DEPS_DIR/openssl" \
+        "./Configure && make -j$COMPILE_NUM" \
+        "$BUILD_DEPS_DIR/openssl/libcrypto.a" \
+        "$BUILD_DEPS_DIR/openssl/libssl.a"
+
+    # RocksDB
+    compile_library "RocksDB" \
+        "$DEPS_DIR/rocksdb" \
+        "$BUILD_DEPS_DIR/rocksdb" \
+        "make static_lib USE_RTTI=1 -j$COMPILE_NUM" \
+        "$BUILD_DEPS_DIR/rocksdb/librocksdb.a"
+
+    # Protobuf
+    compile_library "Protobuf" \
+        "$DEPS_DIR/protobuf" \
+        "$BUILD_DEPS_DIR/protobuf" \
+        "mkdir -p build && cd build && cmake .. && make -j$COMPILE_NUM" \
+        "$BUILD_DEPS_DIR/protobuf/build/libprotobuf.a" \
+        "$BUILD_DEPS_DIR/protobuf/build/libprotobuf-lite.a"
+
+    # Boost
+    compile_library "Boost" \
+        "$DEPS_DIR/boost" \
+        "$BUILD_DEPS_DIR/boost" \
+        "./bootstrap.sh --prefix=$BUILD_DEPS_DIR/boost/stage && ./b2 -j$COMPILE_NUM --build-dir=$BUILD_DEPS_DIR/boost/build_tmp install" \
+        "$BUILD_DEPS_DIR/boost/stage/lib/libboost_system.a" \
+        "$BUILD_DEPS_DIR/boost/stage/lib/libboost_filesystem.a"
+
+    # libfmt
+    compile_library "libfmt" \
+        "$DEPS_DIR/libfmt" \
+        "$BUILD_DEPS_DIR/libfmt" \
+        "rm -rf CMakeCache.txt && cmake -B . -S . -DCMAKE_POSITION_INDEPENDENT_CODE=ON && make -j$COMPILE_NUM" \
+        "$BUILD_DEPS_DIR/libfmt/libfmt.a"
+
+    # spdlog
+    compile_library "spdlog" \
+        "$DEPS_DIR/spdlog" \
+        "$BUILD_DEPS_DIR/spdlog" \
+        "fmt_DIR=$BUILD_DEPS_DIR/libfmt cmake -DSPDLOG_FMT_EXTERNAL=yes . && make -j$COMPILE_NUM" \
+        "$BUILD_DEPS_DIR/spdlog/libspdlog.a"
+
+    # Silkpre
+    SILKPRE_LIB_PATHS=("$BUILD_DEPS_DIR/silkpre/build/lib/libsilkpre-standalone.a" "$BUILD_DEPS_DIR/silkpre/build/libsilkpre-standalone.a")
+    copy_library_files "Silkpre" "$DEPS_DIR/silkpre" "$BUILD_DEPS_DIR/silkpre"
+    
+    if find_library "Silkpre" "${SILKPRE_LIB_PATHS[@]}"; then
+        echo "Silkpre library already exists, skipping compilation"
+    else
+        echo "Installing GMP dependencies..."
+        # Install GMP library
+        if ! bash ./gmp.sh ; then
+            log_message "Error: gmp.sh execution failed."
+            exit 1
+        fi
+        
+        if cd $BUILD_DEPS_DIR/silkpre && mkdir -p build && cmake -S . -B build && cd build && make -j$COMPILE_NUM 2>> "$ERROR_LOG_FILE"; then
+            if [ -f "$BUILD_DEPS_DIR/silkpre/build/lib/libsilkpre-standalone.a" ]; then
+                echo "Silkpre compilation completed successfully"
+                echo "Silkpre library location: $BUILD_DEPS_DIR/silkpre/build/lib/libsilkpre-standalone.a"
+            else
+                FAILED_BUILDS+=("Silkpre")
+            fi
+        else
+            FAILED_BUILDS+=("Silkpre")
+        fi
+    fi
+
+    # EVMone
+    compile_library "EVMone" \
+        "$DEPS_DIR/evmone" \
+        "$BUILD_DEPS_DIR/evmone" \
+        "mkdir -p build && cmake -S . -B build -DBUILD_SHARED_LIBS=OFF && cd build && make -j$COMPILE_NUM" \
+        "$BUILD_DEPS_DIR/evmone/build/lib64/libevmone-standalone.a" \
+        "$BUILD_DEPS_DIR/evmone/build/lib/libevmone-standalone.a"
+
+    # Crypto++
+    compile_library "Crypto++" \
+        "$DEPS_DIR/cryptopp" \
+        "$BUILD_DEPS_DIR/cryptopp" \
+        "make -j$COMPILE_NUM" \
+        "$BUILD_DEPS_DIR/cryptopp/libcryptopp.a"
+}
+
+# Execute compilation
+if compile_libraries; then
+    echo "All dependency libraries compiled successfully"
+else
+    echo "Some dependency libraries failed to compile"
+    exit 1
 fi
-
-# rocksdb
-if [ ! -f "$ROCKSDB_DIR/librocksdb.a" ]; then
-        cd $ROCKSDB_DIR && make static_lib USE_RTTI=1 -j$COMPILE_NUM
-fi
-
-
-# protobuf
-if [ ! -f "$PROTOBUF_DIR/build/libprotobuf.a" ]; then
-        cd $PROTOBUF_DIR && mkdir -p build && cd build && cmake -Dprotobuf_BUILD_TESTS=OFF .. && make -j$COMPILE_NUM
-fi
-
-# libfmt
-if [ ! -f "$LIBFMT_DIR/libfmt.a" ]; then
-    compile_and_move "libfmt" \
-        cd $LIBFMT_DIR && rm -rf CMakeCache.txt && cmake -B . -S . -DCMAKE_POSITION_INDEPENDENT_CODE=ON && make -j$COMPILE_NUM
-fi
-
-cd $SHDIR
-echo "-- make depend done."
